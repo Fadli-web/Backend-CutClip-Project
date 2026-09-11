@@ -115,9 +115,8 @@ router.post('/ai/queue-clips', async (req, res) => {
   }
 
   try {
-    // Siapkan baris insert
+    // Siapkan baris insert yang sesuai dengan skema tabel clips di Supabase
     const insertPayload = clips.map((c) => ({
-      project_id: projectId || null,
       user_id: userId,
       youtube_url: c.youtube_url,
       youtube_video_id: c.youtube_video_id,
@@ -125,11 +124,6 @@ router.post('/ai/queue-clips', async (req, res) => {
       thumbnail_url: c.thumbnail_url || null,
       start_time: c.start_time,
       end_time: c.end_time,
-      ai_generated: true,
-      virality_score: c.virality_score || 80,
-      curation_reason: c.curation_reason || null,
-      hook_text: c.hook_text || null,
-      suggested_caption: c.suggested_caption || null,
       status: 'queued',
       progress: 0,
     }));
