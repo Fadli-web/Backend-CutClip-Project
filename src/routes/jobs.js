@@ -1,5 +1,5 @@
 import express from 'express';
-import { getVideoMetadata } from '../services/ytdlp.js';
+import { getVideoMetadata, getExecutableCommand } from '../services/ytdlp.js';
 import { extractVideoTranscript } from '../services/transcript.js';
 import { analyzeTranscriptWithGemini } from '../services/gemini.js';
 import { processClipJob } from '../services/worker.js';

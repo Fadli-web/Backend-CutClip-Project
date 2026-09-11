@@ -71,8 +71,8 @@ export async function getVideoMetadata(url) {
       '--skip-download',
       '--js-runtimes', 'node',
       // Gunakan mobile client agar tidak ditantang "Sign in to confirm you're not a bot"
-      '--extractor-args', 'youtube:player_client=ios,android,mweb',
-      '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+      '--extractor-args', 'youtube:player_client=android,mweb',
+      '--user-agent', 'Mozilla/5.0 (Linux; Android 13; SM-G981B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36',
     ];
 
     if (config.proxyUrl) {
@@ -150,11 +150,11 @@ export async function downloadVideoSegment({ url, startTime, endTime, outputTemp
     '--no-playlist',
     '--download-sections', sectionSpec,
     '--force-keyframes-at-cuts',
-    '-f', 'bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4] / bv*+ba/b',
+    '-f', 'best/bestvideo+bestaudio/b',
     '--js-runtimes', 'node',
-    // Mobile client bypass untuk cloud server
-    '--extractor-args', 'youtube:player_client=ios,android,mweb',
-    '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+    // Mobile client bypass untuk cloud server (hindari ios karena melempar "This video is unavailable")
+    '--extractor-args', 'youtube:player_client=android,mweb',
+    '--user-agent', 'Mozilla/5.0 (Linux; Android 13; SM-G981B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36',
     '-o', outputTemplate,
   ];
 
