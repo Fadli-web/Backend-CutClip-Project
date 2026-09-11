@@ -111,11 +111,13 @@ export async function processClipJob(clipId) {
     await updateClipStatus(clipId, { progress: 60 });
 
     const clipDuration = clip.end_time - clip.start_time;
+    const clipFormat = clip.aspect_ratio || '9:16';
     await cutAndEncodeVideo({
       inputPath: downloadedPath,
       outputPath: finalOutputFile,
       startTime: 0, // Karena segmen sudah dipotong di yt-dlp, kita normalisasi dari 0
       duration: clipDuration,
+      format: clipFormat,
       onProgress: async (p) => {
         // Rentang FFmpeg: 60% s.d 80%
         const mappedProgress = Math.round(60 + (p * 0.2));

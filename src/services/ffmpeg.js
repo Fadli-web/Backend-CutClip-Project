@@ -12,15 +12,17 @@ if (config.ffmpegPath) {
 
 /**
  * Memotong dan mengode ulang video ke MP4 standar web (H.264 + AAC + FastStart)
+ * Mendukung format vertikal 9:16 (TikTok, Reels, Shorts) dengan background blur estetik
  * @param {Object} options
  * @param {string} options.inputPath - Path video input
  * @param {string} options.outputPath - Path video output (.mp4)
  * @param {number} options.startTime - Waktu awal cuplikan (detik)
  * @param {number} options.duration - Durasi cuplikan (detik)
+ * @param {string} [options.format='9:16'] - Format rasio ('9:16' vertikal atau 'original')
  * @param {function} [options.onProgress] - Callback progress persentase (0-100)
  * @returns {Promise<{ outputPath: string, duration: number, sizeBytes: number }>}
  */
-export function cutAndEncodeVideo({ inputPath, outputPath, startTime, duration, onProgress }) {
+export function cutAndEncodeVideo({ inputPath, outputPath, startTime, duration, format = '9:16', onProgress }) {
   return new Promise((resolve, reject) => {
     let command = ffmpeg(inputPath);
 
@@ -31,6 +33,15 @@ export function cutAndEncodeVideo({ inputPath, outputPath, startTime, duration, 
 
     if (duration) {
       command = command.setDuration(duration);
+    }
+
+    // Format vertikal 9:16 (1080x1920) dengan blur background estetik untuk TikTok, Reels, & Shorts
+    if (format === '9:16') {
+      command.complexFilter([
+        '[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=25:5[bg]',
+        '[0:v]scale=1080:-2[fg]',
+        '[bg][fg]overlay=(W-w)/2:(H-h)/2[v]',
+      ], 'v');
     }
 
     command
