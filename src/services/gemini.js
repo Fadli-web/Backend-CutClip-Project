@@ -18,19 +18,23 @@ export async function analyzeTranscriptWithGemini({ videoTitle, videoDuration, f
 
   const ai = new GoogleGenAI({ apiKey: config.geminiApiKey });
 
+  const modelName = config.geminiModel || 'gemini-3.5-flash';
+
   const systemInstruction = `
 Kamu adalah kurator video pendek viral profesional kelas dunia (ahli dalam YouTube Shorts, TikTok, dan Instagram Reels).
-Tugas utamamu adalah menganalisis transkrip video berstempel waktu (timestamped transcript) dari rekaman siniar, gelar wicara, siaran langsung gim, atau wawancara, lalu menemukan 3 hingga 6 momen terbaik untuk dijadikan video pendek vertikal.
+Tugas utamamu adalah menganalisis konten video YouTube (baik dari transkrip berstempel waktu maupun estimasi ritme berdasarkan judul & durasi), lalu menemukan 3 hingga 6 momen terbaik untuk dijadikan video pendek vertikal.
 
 Kriteria Cuplikan Viral:
 1. **Hook yang Menusuk**: Dimulai dengan kalimat pembuka yang langsung memicu rasa ingin tahu, pernyataan kontroversial, atau pertanyaan menggelitik.
-2. **Klimaks Emosi / Wawasan**: Mengandung puncak kelucuan, punchline jenaka, momen dramatis, atau wawasan daging yang bernilai tinggi.
-3. **Alur Kalimat Alami (Natural Boundaries)**: Waktu mulai (start_time) HARUS berada tepat di awal kalimat baru, dan waktu selesai (end_time) HARUS berada di titik henti kalimat yang tuntas. JANGAN memotong di tengah-tengah kata atau kalimat yang belum selesai.
+2. **Klimaks Emosi / Wawasan**: Mengandung puncak kelucuan, punchline jenaka, momen dramatis, aksi menegangkan, atau wawasan daging yang bernilai tinggi.
+3. **Alur Klip Alami**: Waktu mulai (start_time) dan waktu selesai (end_time) harus berada dalam batas durasi video total (0 hingga ${videoDuration} detik).
 4. **Durasi Optimal**: Setiap klip berdurasi antara 15 hingga 90 detik (harus berada dalam batas minimum 3 detik dan maksimum 180 detik).
 5. **Skor Viralitas (1 - 100)**: Berikan penilaian realistis berdasarkan kekuatan hook, retensi penonton, dan potensi dibagikan (shareability).
 `;
 
-  const userPrompt = `
+  let userPrompt = '';
+  if (formattedTranscript && formattedTranscript.trim().length > 0) {
+    userPrompt = `
 Berikut adalah data video YouTube yang perlu kamu kurasi:
 - Judul Video: "${videoTitle}"
 - Total Durasi: ${videoDuration} detik (~${(videoDuration / 60).toFixed(1)} menit)
@@ -42,14 +46,25 @@ ${formattedTranscript}
 
 Instruksi Tambahan:
 - Berikan ringkasan video secara umum (summary).
-- Ekstrak 3 sampai 6 rekomendasi klip terbaik dengan format terstruktur.
-- Pastikan start_time dan end_time menggunakan angka detik (contoh: 45.2).
+- Ekstrak 3 sampai 6 rekomendasi klip terbaik dengan titik start_time dan end_time presisi berdasarkan stempel waktu transkrip.
 `;
+  } else {
+    userPrompt = `
+Berikut adalah data video YouTube yang perlu kamu kurasi (video ini tidak memiliki takarir teks berstempel waktu bawaan):
+- Judul Video: "${videoTitle}"
+- Total Durasi: ${videoDuration} detik (~${(videoDuration / 60).toFixed(1)} menit)
 
-  console.log(`🤖 [Gemini] Mengirim transkrip video ke model ${config.geminiModel}...`);
+Instruksi Khusus (Tanpa Takarir):
+- Berikan ringkasan video secara umum (summary) berdasarkan konteks judul dan genre konten tersebut.
+- Prediksikan 3 sampai 5 segmen highlight klip terbaik yang terdistribusi secara dinamis sepanjang durasi video (misalnya momen pembuka/intro, aksi seru/klimaks di pertengahan video, dan konklusi/penutup seru).
+- Pastikan setiap klip memiliki start_time dan end_time yang realistis (antara 0 hingga ${videoDuration} detik), dengan durasi masing-masing klip berkisar 15 - 60 detik.
+`;
+  }
+
+  console.log(`🤖 [Gemini] Mengirim data video ke model ${modelName}...`);
 
   const response = await ai.models.generateContent({
-    model: config.geminiModel || 'gemini-flash-latest',
+    model: modelName,
     contents: userPrompt,
     config: {
       systemInstruction,

@@ -29,7 +29,7 @@ export const config = {
   
   // Google AI Studio Gemini Flash Configuration
   geminiApiKey: process.env.GEMINI_API_KEY || '',
-  geminiModel: process.env.GEMINI_MODEL || 'gemini-flash-latest',
+  geminiModel: process.env.GEMINI_MODEL || 'gemini-3.5-flash',
 
   // Custom binaries if specified (defaults to system PATH or packages)
   ffmpegPath: process.env.FFMPEG_PATH || '',
