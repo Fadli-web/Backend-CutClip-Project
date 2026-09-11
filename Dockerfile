@@ -4,13 +4,15 @@
 
 FROM node:22-bookworm-slim
 
-# Pasang dependency sistem: FFmpeg, Python3, curl, ca-certificates
+# Pasang dependency sistem: FFmpeg, Python3, curl, ca-certificates, python-is-python3
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     python3 \
+    python-is-python3 \
     python3-pip \
     curl \
     ca-certificates \
+    && ln -sf /usr/bin/python3 /usr/bin/python \
     && rm -rf /var/lib/apt/lists/*
 
 # Pasang yt-dlp versi binary rilis terbaru langsung dari GitHub
