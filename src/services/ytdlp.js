@@ -39,6 +39,28 @@ export async function getExecutableCommand() {
 }
 
 /**
+ * Memeriksa dan menyediakan berkas cookies YouTube jika dikonfigurasi
+ */
+function getEffectiveCookiesPath() {
+  if (config.cookiesPath && fs.existsSync(config.cookiesPath)) {
+    return config.cookiesPath;
+  }
+  const cookiesEnv = process.env.YT_COOKIES_CONTENT || process.env.YOUTUBE_COOKIES;
+  if (cookiesEnv && cookiesEnv.trim().length > 0) {
+    const tempCookies = path.join(config.tempDir, 'youtube_cookies.txt');
+    try {
+      if (!fs.existsSync(tempCookies)) {
+        fs.writeFileSync(tempCookies, cookiesEnv.trim(), 'utf8');
+      }
+      return tempCookies;
+    } catch (e) {
+      console.warn('⚠️ Gagal menulis temp cookies:', e.message);
+    }
+  }
+  return null;
+}
+
+/**
  * Mengambil metadata video YouTube (judul, thumbnail, durasi total, id)
  * Menggunakan YouTube Official oEmbed API sebagai benteng utama (100% bebas blokir bot)
  * dipadukan dengan yt-dlp mobile client.
@@ -78,8 +100,9 @@ export async function getVideoMetadata(url) {
     if (config.proxyUrl) {
       args.push('--proxy', config.proxyUrl);
     }
-    if (config.cookiesPath && fs.existsSync(config.cookiesPath)) {
-      args.push('--cookies', config.cookiesPath);
+    const cookiesFile = getEffectiveCookiesPath();
+    if (cookiesFile) {
+      args.push('--cookies', cookiesFile);
     }
 
     args.push(url);
@@ -161,8 +184,9 @@ export async function downloadVideoSegment({ url, startTime, endTime, outputTemp
   if (config.proxyUrl) {
     args.push('--proxy', config.proxyUrl);
   }
-  if (config.cookiesPath && fs.existsSync(config.cookiesPath)) {
-    args.push('--cookies', config.cookiesPath);
+  const cookiesFile = getEffectiveCookiesPath();
+  if (cookiesFile) {
+    args.push('--cookies', cookiesFile);
   }
 
   args.push(url);

@@ -148,9 +148,18 @@ export async function processClipJob(clipId) {
 
   } catch (err) {
     console.error(`💥 [Worker] Gagal memproses klip ${clipId}:`, err.message);
+    let friendlyError = err.message || 'Terjadi kesalahan internal saat pemrosesan klip.';
+    if (friendlyError.includes("Sign in to confirm you’re not a bot") || friendlyError.includes("Sign in to confirm you're not a bot")) {
+      friendlyError = 'YouTube membatasi video ini dengan proteksi bot / login Google. Silakan coba tautan video YouTube publik lainnya.';
+    } else if (friendlyError.includes('This video is unavailable') || friendlyError.includes('Private video')) {
+      friendlyError = 'Video tidak tersedia atau berstatus privat di YouTube.';
+    } else if (friendlyError.includes('SIGKILL') || friendlyError.includes('killed with signal')) {
+      friendlyError = 'Alokasi RAM server tidak mencukupi untuk video berdurasi ini.';
+    }
+
     await updateClipStatus(clipId, {
       status: 'failed',
-      error_message: err.message || 'Terjadi kesalahan internal saat pemrosesan klip.',
+      error_message: friendlyError,
     });
   } finally {
     // 7. Bersihkan file lokal sementara di disk
