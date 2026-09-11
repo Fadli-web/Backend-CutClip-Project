@@ -35,7 +35,7 @@ router.post('/jobs/metadata', async (req, res) => {
 
 // 3. AI Studio Gemini Flash: Analisis Video Panjang & Temukan Klip Viral
 router.post('/ai/analyze', async (req, res) => {
-  const { url, userId } = req.body;
+  const { url, userId, geminiApiKey } = req.body;
   if (!url) {
     return res.status(400).json({ error: 'Parameter "url" YouTube wajib disertakan.' });
   }
@@ -75,6 +75,7 @@ router.post('/ai/analyze', async (req, res) => {
       videoTitle: metadata.title,
       videoDuration: metadata.duration,
       formattedTranscript: transcriptData.formattedTranscript,
+      apiKey: geminiApiKey,
     });
 
     // E. Perbarui status proyek di basis data

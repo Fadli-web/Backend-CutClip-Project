@@ -11,12 +11,13 @@ import { config } from '../config/env.js';
  * @param {string} options.formattedTranscript - Transkrip berstempel waktu
  * @returns {Promise<{ summary: string, recommendations: Array<Object> }>}
  */
-export async function analyzeTranscriptWithGemini({ videoTitle, videoDuration, formattedTranscript }) {
-  if (!config.geminiApiKey) {
-    throw new Error('GEMINI_API_KEY belum disetel di file .env! Dapatkan API Key gratis di Google AI Studio (aistudio.google.com).');
+export async function analyzeTranscriptWithGemini({ videoTitle, videoDuration, formattedTranscript, apiKey }) {
+  const activeKey = apiKey || config.geminiApiKey;
+  if (!activeKey) {
+    throw new Error('GEMINI_API_KEY belum disetel! Dapatkan API Key gratis di Google AI Studio (aistudio.google.com).');
   }
 
-  const ai = new GoogleGenAI({ apiKey: config.geminiApiKey });
+  const ai = new GoogleGenAI({ apiKey: activeKey });
 
   const modelName = config.geminiModel || 'gemini-3.5-flash';
 
