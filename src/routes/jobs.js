@@ -17,6 +17,39 @@ router.get('/health', (req, res) => {
   });
 });
 
+// Debug endpoint untuk memvalidasi yt-dlp player clients di peladen Railway
+router.get('/test-ytdlp', async (req, res) => {
+  const testUrl = req.query.url || 'https://www.youtube.com/watch?v=ky9CLhIEdgo';
+  const playerClient = req.query.client || 'android,web';
+
+  try {
+    const { cmd, prefixArgs } = await getExecutableCommand();
+    const args = [
+      ...prefixArgs,
+      '--dump-json',
+      '--no-playlist',
+      '--skip-download',
+      '--js-runtimes', 'node',
+      '--extractor-args', `youtube:player_client=${playerClient}`,
+      testUrl,
+    ];
+
+    const { spawn } = await import('child_process');
+    const proc = spawn(cmd, args);
+    let stdout = '';
+    let stderr = '';
+    proc.stdout.on('data', (d) => { stdout += d.toString(); });
+    proc.stderr.on('data', (d) => { stderr += d.toString(); });
+    proc.on('close', (code) => {
+      let title = null;
+      try { title = JSON.parse(stdout).title; } catch (_) {}
+      res.json({ code, title, stderr });
+    });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // 2. Ekstrak Metadata YouTube Manual
 router.post('/jobs/metadata', async (req, res) => {
   const { url } = req.body;
