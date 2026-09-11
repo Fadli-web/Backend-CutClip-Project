@@ -35,11 +35,14 @@ export function cutAndEncodeVideo({ inputPath, outputPath, startTime, duration, 
       command = command.setDuration(duration);
     }
 
-    // Format vertikal 9:16 (1080x1920) dengan blur background estetik untuk TikTok, Reels, & Shorts
+    // Format vertikal 9:16 hemat RAM & super cepat (optimal untuk Railway 512MB)
     if (format === '9:16') {
       command.complexFilter([
-        '[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=25:5[bg]',
-        '[0:v]scale=1080:-2[fg]',
+        // Background: downscale ke 180x320, blur ringan, lalu upscale ke 720x1280 (menghemat RAM hingga 90%)
+        '[0:v]scale=180:320:force_original_aspect_ratio=increase,crop=180:320,boxblur=4:2,scale=720:1280:flags=fast_bilinear[bg]',
+        // Foreground: video asli di tengah dengan lebar 720
+        '[0:v]scale=720:-2:flags=fast_bilinear[fg]',
+        // Overlay di tengah
         '[bg][fg]overlay=(W-w)/2:(H-h)/2[v]',
       ], 'v');
     }
@@ -49,8 +52,9 @@ export function cutAndEncodeVideo({ inputPath, outputPath, startTime, duration, 
       .audioCodec('aac')
       .audioBitrate('128k')
       .outputOptions([
-        '-preset fast',
-        '-crf 23',
+        '-preset veryfast',
+        '-crf 26',
+        '-threads 2',           // Mencegah lonjakan RAM di peladen cloud
         '-movflags +faststart', // Web streaming friendly
         '-pix_fmt yuv420p',    // Kompatibilitas luas di semua browser/mobile
       ])
