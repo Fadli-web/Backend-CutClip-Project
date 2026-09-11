@@ -5,7 +5,7 @@ import { config } from '../config/env.js';
 import { getVideoMetadata, getExecutableCommand } from '../services/ytdlp.js';
 import { extractVideoTranscript } from '../services/transcript.js';
 import { analyzeTranscriptWithGemini } from '../services/gemini.js';
-import { processClipJob } from '../services/worker.js';
+import { processClipJob, registerClipParams } from '../services/worker.js';
 import { cleanupExpiredClips } from '../services/cron.js';
 import { supabaseAdmin } from '../services/supabase.js';
 
@@ -173,8 +173,19 @@ router.post('/ai/queue-clips', async (req, res) => {
       throw new Error(`Gagal menyimpan antrean klip: ${error.message}`);
     }
 
-    // Picu pemrosesan asinkron untuk klip pertama
+    // Simpan parameter caption dan picu pemrosesan klip
     if (insertedClips && insertedClips.length > 0) {
+      insertedClips.forEach((inserted, i) => {
+        const originalInput = clips[i];
+        if (originalInput) {
+          registerClipParams(inserted.id, {
+            captionText: originalInput.caption_text || originalInput.hook_text || '',
+            captionPosition: originalInput.caption_position || 'bottom',
+          });
+        }
+      });
+
+      // Picu pemrosesan asinkron untuk klip pertama
       processClipJob(insertedClips[0].id).catch(err => {
         console.error('Trigger process clip gagal:', err.message);
       });
@@ -195,8 +206,14 @@ router.post('/ai/queue-clips', async (req, res) => {
 // 5. Trigger Segera Pemrosesan Klip Tunggal
 router.post('/jobs/process/:clipId', async (req, res) => {
   const { clipId } = req.params;
+  const { captionText, captionPosition } = req.body || {};
+
   if (!clipId) {
     return res.status(400).json({ error: 'Parameter clipId wajib disertakan.' });
+  }
+
+  if (captionText) {
+    registerClipParams(clipId, { captionText, captionPosition });
   }
 
   processClipJob(clipId).catch((err) => {

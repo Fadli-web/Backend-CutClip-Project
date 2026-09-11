@@ -17,12 +17,55 @@ if (config.ffmpegPath) {
  * @param {string} options.inputPath - Path video input
  * @param {string} options.outputPath - Path video output (.mp4)
  * @param {number} options.startTime - Waktu awal cuplikan (detik)
+/**
+ * Memecah teks panjang menjadi beberapa baris agar pas pada layar vertikal 9:16
+ */
+function wrapCaptionText(text, maxCharsPerLine = 26) {
+  if (!text) return '';
+  const clean = text.replace(/\r?\n/g, ' ').trim();
+  const words = clean.split(/\s+/);
+  const lines = [];
+  let currentLine = '';
+  for (const word of words) {
+    if (!currentLine) {
+      currentLine = word;
+    } else if ((currentLine + ' ' + word).length <= maxCharsPerLine) {
+      currentLine += ' ' + word;
+    } else {
+      lines.push(currentLine);
+      currentLine = word;
+    }
+  }
+  if (currentLine) lines.push(currentLine);
+  return lines.join('\n');
+}
+
+/**
+ * Memotong dan mengode ulang video ke MP4 standar web (H.264 + AAC + FastStart)
+ * Mendukung format vertikal 9:16 (TikTok, Reels, Shorts) dengan background blur estetik
+ * serta opsi teks caption / subtitle burned-in yang dapat disesuaikan.
+ *
+ * @param {Object} options
+ * @param {string} options.inputPath - Path video input
+ * @param {string} options.outputPath - Path video output (.mp4)
+ * @param {number} options.startTime - Waktu awal cuplikan (detik)
  * @param {number} options.duration - Durasi cuplikan (detik)
  * @param {string} [options.format='9:16'] - Format rasio ('9:16' vertikal atau 'original')
+ * @param {string} [options.captionText=''] - Teks caption / subtitle yang dibakar ke video
+ * @param {string} [options.captionPosition='bottom'] - Posisi caption ('bottom' atau 'center')
  * @param {function} [options.onProgress] - Callback progress persentase (0-100)
  * @returns {Promise<{ outputPath: string, duration: number, sizeBytes: number }>}
  */
-export function cutAndEncodeVideo({ inputPath, outputPath, startTime, duration, format = '9:16', onProgress }) {
+export function cutAndEncodeVideo({
+  inputPath,
+  outputPath,
+  startTime,
+  duration,
+  format = '9:16',
+  captionText = '',
+  captionPosition = 'bottom',
+  onProgress,
+}) {
   return new Promise((resolve, reject) => {
     let command = ffmpeg(inputPath);
 
@@ -45,14 +88,32 @@ export function cutAndEncodeVideo({ inputPath, outputPath, startTime, duration, 
 
     // Format vertikal 9:16 hemat RAM & super cepat (optimal untuk Railway 512MB)
     if (format === '9:16') {
-      command.complexFilter([
+      const filters = [
         // Background: downscale ke 180x320, blur ringan, lalu upscale ke 720x1280 (menghemat RAM hingga 90%)
         '[0:v]scale=180:320:force_original_aspect_ratio=increase,crop=180:320,boxblur=4:2,scale=720:1280:flags=fast_bilinear[bg]',
         // Foreground: video asli di tengah dengan lebar 720
         '[0:v]scale=720:-2:flags=fast_bilinear[fg]',
-        // Overlay di tengah menghasilkan stream video [v]
-        '[bg][fg]overlay=(W-w)/2:(H-h)/2[v]',
-      ]);
+      ];
+
+      if (captionText && captionText.trim()) {
+        const wrapped = wrapCaptionText(captionText);
+        const escaped = wrapped
+          .replace(/\\/g, '\\\\')
+          .replace(/'/g, "\\'")
+          .replace(/:/g, '\\:')
+          .replace(/%/g, '\\%');
+
+        const yPos = captionPosition === 'center' ? '(h-text_h)/2' : 'h-text_h-220';
+
+        filters.push(
+          '[bg][fg]overlay=(W-w)/2:(H-h)/2[v_base]',
+          `[v_base]drawtext=text='${escaped}':fontcolor=yellow:fontsize=32:line_spacing=8:borderw=3:bordercolor=black:box=1:boxcolor=black@0.5:boxborderw=12:x=(w-text_w)/2:y=${yPos}[v]`
+        );
+      } else {
+        filters.push('[bg][fg]overlay=(W-w)/2:(H-h)/2[v]');
+      }
+
+      command.complexFilter(filters);
       // Petakan kedua stream: video vertikal [v] DAN audio asli 0:a?
       outputOptions.unshift('-map [v]', '-map 0:a?');
     }

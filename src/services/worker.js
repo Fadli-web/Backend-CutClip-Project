@@ -7,6 +7,16 @@ import { uploadClipToStorage } from './storage.js';
 import { config } from '../config/env.js';
 
 let isProcessing = false;
+const clipJobParams = new Map();
+
+/**
+ * Mendaftarkan parameter tambahan (caption / subtitle) untuk pemrosesan klip
+ */
+export function registerClipParams(clipId, params) {
+  if (clipId && params) {
+    clipJobParams.set(clipId, params);
+  }
+}
 
 /**
  * Memperbarui status dan progress tugas klip di Supabase DB
@@ -44,9 +54,14 @@ function cleanLocalFiles(...filePaths) {
 /**
  * Memproses 1 tugas pemotongan video (Clip Job)
  * @param {string} clipId - UUID klip di tabel `clips`
+ * @param {Object} [extraParams] - Parameter tambahan seperti captionText
  */
-export async function processClipJob(clipId) {
+export async function processClipJob(clipId, extraParams = {}) {
   console.log(`\n🎬 [Worker] Memulai pemrosesan tugas klip: ${clipId}`);
+
+  const extra = { ...(clipJobParams.get(clipId) || {}), ...extraParams };
+  const captionText = extra.captionText || clipJobParams.get(clipId)?.captionText || '';
+  const captionPosition = extra.captionPosition || 'bottom';
 
   // 1. Ambil data klip dari Supabase
   const { data: clip, error } = await supabaseAdmin
@@ -107,7 +122,7 @@ export async function processClipJob(clipId) {
     });
 
     // 4. Potong presisi & Transcode ke standar web MP4 via FFmpeg
-    console.log(`✂️ [Worker] Transcoding FFmpeg ke format MP4 H.264...`);
+    console.log(`✂️ [Worker] Transcoding FFmpeg ke format MP4 H.264 (Caption: "${captionText || 'none'}")...`);
     await updateClipStatus(clipId, { progress: 60 });
 
     const clipDuration = clip.end_time - clip.start_time;
@@ -118,6 +133,8 @@ export async function processClipJob(clipId) {
       startTime: 0, // Karena segmen sudah dipotong di yt-dlp, kita normalisasi dari 0
       duration: clipDuration,
       format: clipFormat,
+      captionText,
+      captionPosition,
       onProgress: async (p) => {
         // Rentang FFmpeg: 60% s.d 80%
         const mappedProgress = Math.round(60 + (p * 0.2));
