@@ -1,4 +1,7 @@
 import express from 'express';
+import path from 'path';
+import fs from 'fs';
+import { config } from '../config/env.js';
 import { getVideoMetadata, getExecutableCommand } from '../services/ytdlp.js';
 import { extractVideoTranscript } from '../services/transcript.js';
 import { analyzeTranscriptWithGemini } from '../services/gemini.js';
@@ -235,6 +238,45 @@ router.post('/jobs/clean-expired', async (req, res) => {
     res.json({ success: true, result });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// 8. Pengaturan Cookies YouTube (Untuk Bypass Blokir Bot Datacenter)
+router.get('/settings/cookies/status', (req, res) => {
+  const customCookiesPath = path.join(config.tempDir, 'youtube_cookies.txt');
+  const hasCookies = !!(
+    (config.cookiesPath && fs.existsSync(config.cookiesPath)) ||
+    fs.existsSync(customCookiesPath) ||
+    (process.env.YT_COOKIES_CONTENT && process.env.YT_COOKIES_CONTENT.trim().length > 0)
+  );
+
+  res.json({
+    success: true,
+    hasCookies,
+    message: hasCookies
+      ? 'Cookies YouTube aktif pada peladen.'
+      : 'Cookies YouTube belum dikonfigurasi.',
+  });
+});
+
+router.post('/settings/cookies', (req, res) => {
+  const { cookies } = req.body;
+
+  if (!cookies || typeof cookies !== 'string' || cookies.trim().length === 0) {
+    return res.status(400).json({ error: 'Data cookies tidak boleh kosong.' });
+  }
+
+  try {
+    const targetPath = path.join(config.tempDir, 'youtube_cookies.txt');
+    fs.writeFileSync(targetPath, cookies.trim(), 'utf8');
+    config.cookiesPath = targetPath;
+
+    res.json({
+      success: true,
+      message: 'Berhasil mengonfigurasi cookies YouTube di peladen.',
+    });
+  } catch (err) {
+    res.status(500).json({ error: `Gagal menyimpan cookies: ${err.message}` });
   }
 });
 
