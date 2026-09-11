@@ -1,0 +1,34 @@
+{
+  "name": "youtube-clipper-backend",
+  "version": "1.0.0",
+  "description": "Backend Worker & API for YouTube Video Clipper using Express, yt-dlp, FFmpeg, and Supabase",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "keywords": [
+    "youtube",
+    "clipper",
+    "ffmpeg",
+    "yt-dlp",
+    "supabase",
+    "express"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "@google/genai": "^2.22.0",
+    "@supabase/supabase-js": "^2.49.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "fluent-ffmpeg": "^2.1.3",
+    "yt-dlp-exec": "^1.0.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  }
+}
