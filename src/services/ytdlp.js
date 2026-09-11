@@ -173,13 +173,18 @@ export async function downloadVideoSegment({ url, startTime, endTime, outputTemp
     '--no-playlist',
     '--download-sections', sectionSpec,
     '--force-keyframes-at-cuts',
-    '-f', 'best/bestvideo+bestaudio/b',
+    '-f', 'bestvideo+bestaudio/best',
+    '--merge-output-format', 'mp4',
     '--js-runtimes', 'node',
     // Mobile client bypass untuk cloud server (hindari ios karena melempar "This video is unavailable")
     '--extractor-args', 'youtube:player_client=android,mweb',
     '--user-agent', 'Mozilla/5.0 (Linux; Android 13; SM-G981B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36',
     '-o', outputTemplate,
   ];
+
+  if (config.ffmpegPath) {
+    args.push('--ffmpeg-location', config.ffmpegPath);
+  }
 
   if (config.proxyUrl) {
     args.push('--proxy', config.proxyUrl);

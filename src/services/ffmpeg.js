@@ -35,6 +35,14 @@ export function cutAndEncodeVideo({ inputPath, outputPath, startTime, duration, 
       command = command.setDuration(duration);
     }
 
+    const outputOptions = [
+      '-preset veryfast',
+      '-crf 26',
+      '-threads 2',           // Mencegah lonjakan RAM di peladen cloud
+      '-movflags +faststart', // Web streaming friendly
+      '-pix_fmt yuv420p',    // Kompatibilitas luas di semua browser/mobile
+    ];
+
     // Format vertikal 9:16 hemat RAM & super cepat (optimal untuk Railway 512MB)
     if (format === '9:16') {
       command.complexFilter([
@@ -42,22 +50,18 @@ export function cutAndEncodeVideo({ inputPath, outputPath, startTime, duration, 
         '[0:v]scale=180:320:force_original_aspect_ratio=increase,crop=180:320,boxblur=4:2,scale=720:1280:flags=fast_bilinear[bg]',
         // Foreground: video asli di tengah dengan lebar 720
         '[0:v]scale=720:-2:flags=fast_bilinear[fg]',
-        // Overlay di tengah
+        // Overlay di tengah menghasilkan stream video [v]
         '[bg][fg]overlay=(W-w)/2:(H-h)/2[v]',
-      ], 'v');
+      ]);
+      // Petakan kedua stream: video vertikal [v] DAN audio asli 0:a?
+      outputOptions.unshift('-map [v]', '-map 0:a?');
     }
 
     command
       .videoCodec('libx264')
       .audioCodec('aac')
       .audioBitrate('128k')
-      .outputOptions([
-        '-preset veryfast',
-        '-crf 26',
-        '-threads 2',           // Mencegah lonjakan RAM di peladen cloud
-        '-movflags +faststart', // Web streaming friendly
-        '-pix_fmt yuv420p',    // Kompatibilitas luas di semua browser/mobile
-      ])
+      .outputOptions(outputOptions)
       .on('progress', (progress) => {
         if (onProgress && progress.percent) {
           onProgress(Math.min(99, Math.max(1, Math.round(progress.percent))));
