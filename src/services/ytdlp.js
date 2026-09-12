@@ -281,9 +281,9 @@ export async function downloadVideoSegment({ url, startTime, endTime, outputTemp
  */
 export async function updateYtDlpIfPossible() {
   try {
-    const { cmd } = await getExecutableCommand();
+    const { cmd, prefixArgs } = await getExecutableCommand();
     console.log('🔄 [yt-dlp] Memeriksa pembaruan yt-dlp...');
-    const { stdout, stderr } = await execFileAsync(cmd, ['-U']);
+    const { stdout, stderr } = await execFileAsync(cmd, [...prefixArgs, '-U']);
     console.log(`✅ [yt-dlp] Status update: ${stdout.trim() || stderr.trim() || 'Versi terkini'}`);
   } catch (err) {
     console.log(`ℹ️ [yt-dlp] Update otomatis dilewati: ${err.message}`);
