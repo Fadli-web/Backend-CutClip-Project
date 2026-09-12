@@ -164,9 +164,8 @@ export async function extractVideoTranscript(url) {
       '--sub-lang', 'id,en,en-orig,en-US',
       '--sub-format', 'vtt',
       '--js-runtimes', 'node',
-      // Mobile client bypass untuk cloud server
-      '--extractor-args', 'youtube:player_client=ios,android,mweb',
-      '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+      // Gunakan player client yang bebas bot challenge & PO token
+      '--extractor-args', 'youtube:player_client=android_vr,web_embedded,tv,ios',
       '-o', outputTemplate,
     ];
 

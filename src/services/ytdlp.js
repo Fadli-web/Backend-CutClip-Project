@@ -92,9 +92,8 @@ export async function getVideoMetadata(url) {
       '--no-playlist',
       '--skip-download',
       '--js-runtimes', 'node',
-      // Gunakan mobile client agar tidak ditantang "Sign in to confirm you're not a bot"
-      '--extractor-args', 'youtube:player_client=android,mweb',
-      '--user-agent', 'Mozilla/5.0 (Linux; Android 13; SM-G981B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36',
+      // Gunakan player client yang bebas dari kewajiban GVS PO Token & anti-bot challenge
+      '--extractor-args', 'youtube:player_client=android_vr,web_embedded,tv,ios',
     ];
 
     if (config.proxyUrl) {
@@ -161,43 +160,11 @@ export async function getVideoMetadata(url) {
 }
 
 /**
- * Mengunduh segmen video spesifik menggunakan --download-sections
- * Dilengkapi mobile client spoofing untuk melewati bot detection Railway
+ * Helper internal untuk mengeksekusi proses unduhan yt-dlp
  */
-export async function downloadVideoSegment({ url, startTime, endTime, outputTemplate, onProgress }) {
-  const { cmd, prefixArgs } = await getExecutableCommand();
-  const sectionSpec = `*${startTime}-${endTime}`;
-
-  const args = [
-    ...prefixArgs,
-    '--no-playlist',
-    '--download-sections', sectionSpec,
-    '--force-keyframes-at-cuts',
-    '-f', 'bestvideo+bestaudio/best',
-    '--merge-output-format', 'mp4',
-    '--js-runtimes', 'node',
-    // Mobile client bypass untuk cloud server (hindari ios karena melempar "This video is unavailable")
-    '--extractor-args', 'youtube:player_client=android,mweb',
-    '--user-agent', 'Mozilla/5.0 (Linux; Android 13; SM-G981B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36',
-    '-o', outputTemplate,
-  ];
-
-  if (config.ffmpegPath) {
-    args.push('--ffmpeg-location', config.ffmpegPath);
-  }
-
-  if (config.proxyUrl) {
-    args.push('--proxy', config.proxyUrl);
-  }
-  const cookiesFile = getEffectiveCookiesPath();
-  if (cookiesFile) {
-    args.push('--cookies', cookiesFile);
-  }
-
-  args.push(url);
-
+function runYtDlpDownload(cmd, args, outputTemplate, onProgress, label = 'unduhan segmen') {
   return new Promise((resolve, reject) => {
-    console.log(`🚀 [yt-dlp] Menjalankan unduhan segmen: ${cmd} ${args.join(' ')}`);
+    console.log(`🚀 [yt-dlp] Menjalankan ${label}: ${cmd} ${args.join(' ')}`);
     const proc = spawn(cmd, args);
     let stderr = '';
 
@@ -216,7 +183,7 @@ export async function downloadVideoSegment({ url, startTime, endTime, outputTemp
 
     proc.on('close', (code) => {
       if (code !== 0) {
-        return reject(new Error(`yt-dlp pengunduhan segmen gagal (exit ${code}): ${stderr}`));
+        return reject(new Error(`yt-dlp ${label} gagal (exit ${code}): ${stderr}`));
       }
 
       const targetDir = path.dirname(outputTemplate);
@@ -230,7 +197,7 @@ export async function downloadVideoSegment({ url, startTime, endTime, outputTemp
         } else if (fs.existsSync(outputTemplate)) {
           resolve(outputTemplate);
         } else {
-          reject(new Error(`File hasil unduhan segmen tidak ditemukan di ${targetDir}`));
+          reject(new Error(`File hasil ${label} tidak ditemukan di ${targetDir}`));
         }
       } catch (err) {
         reject(err);
@@ -241,4 +208,84 @@ export async function downloadVideoSegment({ url, startTime, endTime, outputTemp
       reject(new Error(`Error saat meluncurkan proses yt-dlp: ${err.message}`));
     });
   });
+}
+
+/**
+ * Mengunduh segmen video spesifik.
+ * Prioritas 1: Fast stream cut via --download-sections
+ * Prioritas 2 (Fallback): Unduh video via native yt-dlp downloader jika CDN YouTube menolak FFmpeg (403 Forbidden).
+ */
+export async function downloadVideoSegment({ url, startTime, endTime, outputTemplate, onProgress }) {
+  const { cmd, prefixArgs } = await getExecutableCommand();
+  const sectionSpec = `*${startTime}-${endTime}`;
+
+  const baseArgs = [
+    ...prefixArgs,
+    '--no-playlist',
+    '--js-runtimes', 'node',
+    // Gunakan client yang tidak mewajibkan GVS PO Token & kebal bot challenge di cloud
+    '--extractor-args', 'youtube:player_client=android_vr,web_embedded,tv,ios',
+  ];
+
+  if (config.ffmpegPath) {
+    baseArgs.push('--ffmpeg-location', config.ffmpegPath);
+  }
+  if (config.proxyUrl) {
+    baseArgs.push('--proxy', config.proxyUrl);
+  }
+  const cookiesFile = getEffectiveCookiesPath();
+  if (cookiesFile) {
+    baseArgs.push('--cookies', cookiesFile);
+  }
+
+  // 1. Coba metode cepat: potong langsung segmen via --download-sections
+  const segmentArgs = [
+    ...baseArgs,
+    '--download-sections', sectionSpec,
+    '--force-keyframes-at-cuts',
+    '-f', 'bestvideo+bestaudio/best',
+    '--merge-output-format', 'mp4',
+    '-o', outputTemplate,
+    url,
+  ];
+
+  try {
+    const downloadedPath = await runYtDlpDownload(cmd, segmentArgs, outputTemplate, onProgress, 'unduhan segmen langsung');
+    return { filePath: downloadedPath, isPreCut: true };
+  } catch (segmentErr) {
+    console.warn(`⚠️ [yt-dlp] Unduhan segmen langsung gagal (${segmentErr.message}).`);
+    console.log(`🔄 [yt-dlp] Mengaktifkan Fallback: Mengunduh video menggunakan native downloader yt-dlp...`);
+
+    // 2. Fallback: Unduh video utuh (dibatasi 720p agar cepat & hemat bandwidth cloud)
+    // Pemotongan presisi detik akan ditangani dengan 100% andal oleh FFmpeg lokal
+    const fallbackTemplate = path.join(
+      path.dirname(outputTemplate),
+      `full_${path.basename(outputTemplate)}`
+    );
+
+    const fallbackArgs = [
+      ...baseArgs,
+      '-f', 'bestvideo[height<=720]+bestaudio/best[height<=720]/best',
+      '--merge-output-format', 'mp4',
+      '-o', fallbackTemplate,
+      url,
+    ];
+
+    const fallbackPath = await runYtDlpDownload(cmd, fallbackArgs, fallbackTemplate, onProgress, 'fallback unduhan penuh');
+    return { filePath: fallbackPath, isPreCut: false };
+  }
+}
+
+/**
+ * Memeriksa dan memperbarui binary yt-dlp ke rilis terbaru jika didukung
+ */
+export async function updateYtDlpIfPossible() {
+  try {
+    const { cmd } = await getExecutableCommand();
+    console.log('🔄 [yt-dlp] Memeriksa pembaruan yt-dlp...');
+    const { stdout, stderr } = await execFileAsync(cmd, ['-U']);
+    console.log(`✅ [yt-dlp] Status update: ${stdout.trim() || stderr.trim() || 'Versi terkini'}`);
+  } catch (err) {
+    console.log(`ℹ️ [yt-dlp] Update otomatis dilewati: ${err.message}`);
+  }
 }

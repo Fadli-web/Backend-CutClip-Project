@@ -19,7 +19,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Pasang yt-dlp versi binary rilis terbaru langsung dari GitHub
 # Menggunakan rilis terbaru sangat penting untuk menjaga kompatibilitas player YouTube
 RUN curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp \
-    && chmod a+rx /usr/local/bin/yt-dlp \
+    && chmod a+rwx /usr/local/bin/yt-dlp \
     && mkdir -p /etc \
     && echo "--js-runtimes node:/usr/local/bin/node" > /etc/yt-dlp.conf
 

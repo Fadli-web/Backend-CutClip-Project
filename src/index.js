@@ -2,17 +2,20 @@ import express from 'express';
 import cors from 'cors';
 import { config } from './config/env.js';
 import jobsRouter from './routes/jobs.js';
+import userRouter from './routes/user.js';
 import { pollAndProcessNextJob } from './services/worker.js';
 import { cleanupExpiredClips } from './services/cron.js';
+import { updateYtDlpIfPossible } from './services/ytdlp.js';
 
 const app = express();
 
 // Middlewares
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '15mb' }));
 
 // Routes
 app.use('/api', jobsRouter);
+app.use('/api/user', userRouter);
 
 // Root greeting
 app.get('/', (req, res) => {
@@ -29,6 +32,9 @@ const server = app.listen(config.port, () => {
   console.log(`🚀 YouTube Clipper Worker aktif di port: ${config.port}`);
   console.log(`🌐 Endpoint Health: http://localhost:${config.port}/api/health`);
   console.log(`==================================================\n`);
+
+  // Periksa & update binary yt-dlp ke versi terbaru secara asinkron
+  updateYtDlpIfPossible();
 });
 
 // Start Background Polling Worker (memproses klip antrean otomatis)

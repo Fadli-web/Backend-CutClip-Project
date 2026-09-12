@@ -109,7 +109,7 @@ export async function processClipJob(clipId, extraParams = {}) {
     console.log(`⬇️ [Worker] Mengunduh segmen ${clip.start_time}s s.d ${clip.end_time}s...`);
     await updateClipStatus(clipId, { progress: 25 });
 
-    const downloadedPath = await downloadVideoSegment({
+    const downloadResult = await downloadVideoSegment({
       url: clip.youtube_url,
       startTime: clip.start_time,
       endTime: clip.end_time,
@@ -121,8 +121,11 @@ export async function processClipJob(clipId, extraParams = {}) {
       },
     });
 
+    const downloadedPath = typeof downloadResult === 'string' ? downloadResult : downloadResult.filePath;
+    const isPreCut = typeof downloadResult === 'object' && downloadResult.isPreCut !== undefined ? downloadResult.isPreCut : true;
+
     // 4. Potong presisi & Transcode ke standar web MP4 via FFmpeg
-    console.log(`✂️ [Worker] Transcoding FFmpeg ke format MP4 H.264 (Caption: "${captionText || 'none'}")...`);
+    console.log(`✂️ [Worker] Transcoding FFmpeg ke format MP4 H.264 (Caption: "${captionText || 'none'}", isPreCut: ${isPreCut})...`);
     await updateClipStatus(clipId, { progress: 60 });
 
     const clipDuration = clip.end_time - clip.start_time;
@@ -130,7 +133,7 @@ export async function processClipJob(clipId, extraParams = {}) {
     await cutAndEncodeVideo({
       inputPath: downloadedPath,
       outputPath: finalOutputFile,
-      startTime: 0, // Karena segmen sudah dipotong di yt-dlp, kita normalisasi dari 0
+      startTime: isPreCut ? 0 : clip.start_time, // Jika isPreCut false (hasil fallback), FFmpeg potong dari detik awal
       duration: clipDuration,
       format: clipFormat,
       captionText,
