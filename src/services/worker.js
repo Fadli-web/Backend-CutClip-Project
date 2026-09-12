@@ -4,6 +4,7 @@ import { supabaseAdmin } from './supabase.js';
 import { downloadVideoSegment, getVideoMetadata } from './ytdlp.js';
 import { cutAndEncodeVideo } from './ffmpeg.js';
 import { uploadClipToStorage } from './storage.js';
+import { extractVideoTranscript } from './transcript.js';
 import { config } from '../config/env.js';
 
 let isProcessing = false;
@@ -130,6 +131,24 @@ export async function processClipJob(clipId, extraParams = {}) {
 
     const clipDuration = clip.end_time - clip.start_time;
     const clipFormat = clip.aspect_ratio || '9:16';
+
+    // Ambil segmen subtitle dinamis dari parameter antrean, atau ekstrak otomatis jika belum ada
+    let segments = extra.segments || clipJobParams.get(clipId)?.segments || [];
+    if ((!segments || segments.length === 0) && clip.youtube_url) {
+      try {
+        console.log(`📝 [Worker] Menyiapkan takarir dinamis sinkron pembicara untuk klip ${clipId}...`);
+        const transcriptData = await extractVideoTranscript(clip.youtube_url);
+        if (transcriptData && transcriptData.segments && transcriptData.segments.length > 0) {
+          segments = transcriptData.segments.filter(
+            (s) => s.end >= clip.start_time && s.start <= clip.end_time
+          );
+          console.log(`✨ [Worker] Berhasil memasang ${segments.length} baris subtitle dinamis sinkron kata/kalimat!`);
+        }
+      } catch (subErr) {
+        console.warn('⚠️ Gagal mengambil segmen subtitle dinamis di worker:', subErr.message);
+      }
+    }
+
     await cutAndEncodeVideo({
       inputPath: downloadedPath,
       outputPath: finalOutputFile,
@@ -138,6 +157,8 @@ export async function processClipJob(clipId, extraParams = {}) {
       format: clipFormat,
       captionText,
       captionPosition,
+      segments, // <-- Subtitle dinamis sinkron pembicara
+      clipStartTime: clip.start_time,
       onProgress: async (p) => {
         // Rentang FFmpeg: 60% s.d 80%
         const mappedProgress = Math.round(60 + (p * 0.2));

@@ -117,12 +117,21 @@ function formatSegments(segments) {
 }
 
 /**
+// In-memory cache untuk transkrip agar tidak perlu fetch berulang kali
+export const transcriptCache = new Map();
+
+/**
  * Mengambil transkrip / subtitle video YouTube:
  * 1. Prioritas 1: Ekstraksi langsung via YouTube TimedText API (bebas bot challenge & super cepat)
- * 2. Prioritas 2 (Fallback): Menggunakan yt-dlp dengan mobile client args
+ * 2. Prioritas 2 (Fallback): Menggunakan yt-dlp dengan client bebas bot challenge
  */
 export async function extractVideoTranscript(url) {
   const videoId = extractYouTubeVideoId(url) || url;
+
+  if (transcriptCache.has(videoId)) {
+    console.log(`⚡ [Transcript] Menggunakan transkrip dari cache untuk ID: ${videoId}`);
+    return transcriptCache.get(videoId);
+  }
 
   // METODE 1: Ekstraksi langsung via timedtext / youtube-transcript (Bebas Bot Challenge)
   try {
@@ -141,16 +150,19 @@ export async function extractVideoTranscript(url) {
         };
       });
 
-      return {
+      const result = {
         segments,
         formattedTranscript: formatSegments(segments),
+        hasTranscript: true,
       };
+      transcriptCache.set(videoId, result);
+      return result;
     }
   } catch (timedTextErr) {
     console.warn('⚠️ Ekstraksi TimedText API gagal/tidak tersedia, beralih ke yt-dlp:', timedTextErr.message);
   }
 
-  // METODE 2: Fallback ke yt-dlp dengan mobile player client spoofing
+  // METODE 2: Fallback ke yt-dlp dengan player client bebas bot challenge
   try {
     const { cmd, prefixArgs } = await getExecutableCommand();
     const filePrefix = `sub_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -161,7 +173,7 @@ export async function extractVideoTranscript(url) {
       '--skip-download',
       '--write-auto-subs',
       '--write-subs',
-      '--sub-lang', 'id,en,en-orig,en-US',
+      '--sub-lang', 'id,id-orig,en,en-orig,all,-live_chat',
       '--sub-format', 'vtt',
       '--js-runtimes', 'node',
       // Gunakan player client yang bebas bot challenge & PO token
@@ -180,15 +192,10 @@ export async function extractVideoTranscript(url) {
 
     console.log(`📝 [Transcript Fallback] Mengambil subtitle video via yt-dlp: ${url}`);
 
-    const result = await new Promise((resolve, reject) => {
+    const result = await new Promise((resolve) => {
       const proc = spawn(cmd, args);
-      let stderr = '';
 
-      proc.stderr.on('data', (data) => {
-        stderr += data.toString();
-      });
-
-      proc.on('close', (code) => {
+      proc.on('close', () => {
         try {
           const files = fs.readdirSync(config.tempDir);
           const vttFiles = files.filter((f) => f.startsWith(filePrefix) && f.endsWith('.vtt'));
@@ -225,16 +232,21 @@ export async function extractVideoTranscript(url) {
       });
     });
 
-    if (result) return result;
+    if (result) {
+      transcriptCache.set(videoId, result);
+      return result;
+    }
   } catch (ytSubErr) {
     console.warn('yt-dlp subtitle extraction error:', ytSubErr.message);
   }
 
-  // Jika tidak ada takarir/subtitle (misal musik, video pendek, atau dimatikan oleh kreator)
-  console.log('ℹ️ [Transcript] Video tidak memiliki takarir. Gemini akan memproses kurasi berdasarkan metadata video.');
-  return {
+  // Jika tidak ada takarir/subtitle sama sekali
+  console.log('ℹ️ [Transcript] Video tidak memiliki takarir.');
+  const emptyResult = {
     segments: [],
     formattedTranscript: null,
     hasTranscript: false,
   };
+  transcriptCache.set(videoId, emptyResult);
+  return emptyResult;
 }

@@ -114,6 +114,19 @@ router.post('/ai/analyze', async (req, res) => {
       apiKey: geminiApiKey,
     });
 
+    // Tempelkan segmen takarir berstempel waktu pada masing-masing rekomendasi klip
+    if (analysis.recommendations && transcriptData.segments && transcriptData.segments.length > 0) {
+      analysis.recommendations = analysis.recommendations.map((rec) => {
+        const matchingSegments = transcriptData.segments.filter(
+          (s) => s.end >= rec.start_time && s.start <= rec.end_time
+        );
+        return {
+          ...rec,
+          segments: matchingSegments,
+        };
+      });
+    }
+
     // E. Perbarui status proyek di basis data
     if (projectId) {
       await supabaseAdmin
@@ -173,7 +186,7 @@ router.post('/ai/queue-clips', async (req, res) => {
       throw new Error(`Gagal menyimpan antrean klip: ${error.message}`);
     }
 
-    // Simpan parameter caption dan picu pemrosesan klip
+    // Simpan parameter caption, segmen subtitle dinamis, dan picu pemrosesan klip
     if (insertedClips && insertedClips.length > 0) {
       insertedClips.forEach((inserted, i) => {
         const originalInput = clips[i];
@@ -181,6 +194,8 @@ router.post('/ai/queue-clips', async (req, res) => {
           registerClipParams(inserted.id, {
             captionText: originalInput.caption_text || originalInput.hook_text || '',
             captionPosition: originalInput.caption_position || 'bottom',
+            segments: originalInput.segments || [],
+            youtubeUrl: inserted.youtube_url,
           });
         }
       });

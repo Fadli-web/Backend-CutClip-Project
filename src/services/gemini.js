@@ -40,14 +40,16 @@ Berikut adalah data video YouTube yang perlu kamu kurasi:
 - Judul Video: "${videoTitle}"
 - Total Durasi: ${videoDuration} detik (~${(videoDuration / 60).toFixed(1)} menit)
 
-Transkrip Berstempel Waktu:
+Transkrip Berstempel Waktu (ISI PERCAKAPAN NYATA):
 ---
 ${formattedTranscript}
 ---
 
-Instruksi Tambahan:
-- Berikan ringkasan video secara umum (summary).
-- Ekstrak 3 sampai 6 rekomendasi klip terbaik dengan titik start_time dan end_time presisi berdasarkan stempel waktu transkrip.
+ATURAN SANGAT KETAT & WAJIB DIPATUHI:
+1. DILARANG KERAS BERHALUSINASI atau mengarang topik yang tidak pernah dibahas di transkrip! Seluruh judul klip, deskripsi, dan hook_text HARUS 100% mencerminkan obrolan atau kejadian nyata yang ada pada transkrip di atas.
+2. Tentukan detik 'start_time' dan 'end_time' dengan SANGAT PRESISI mencocokkan stempel waktu pada transkrip di mana topik atau obrolan tersebut dimulai dan diselesaikan secara tuntas.
+3. Nilai 'hook_text' HARUS berupa kalimat pembuka pertama yang benar-benar diucapkan oleh pembicara di transkrip pada detik 'start_time' tersebut (bukan karangan buatanmu).
+4. Judul klip harus secara akurat meringkas apa yang sedang dibahas di potongan tersebut, bukan mengarang teori atau topik yang tidak pernah ada.
 `;
   } else {
     userPrompt = `
@@ -56,8 +58,9 @@ Berikut adalah data video YouTube yang perlu kamu kurasi (video ini tidak memili
 - Total Durasi: ${videoDuration} detik (~${(videoDuration / 60).toFixed(1)} menit)
 
 Instruksi Khusus (Tanpa Takarir):
-- Berikan ringkasan video secara umum (summary) berdasarkan konteks judul dan genre konten tersebut.
-- Prediksikan 3 sampai 5 segmen highlight klip terbaik yang terdistribusi secara dinamis sepanjang durasi video (misalnya momen pembuka/intro, aksi seru/klimaks di pertengahan video, dan konklusi/penutup seru).
+- Berikan ringkasan video secara umum (summary) berdasarkan konteks judul video.
+- Bagi durasi video menjadi 3 sampai 5 segmen highlight klip terbaik yang realistis (misalnya momen pembuka/intro, aksi di pertengahan video, dan penutup).
+- DILARANG mengarang dialog atau kutipan ucapan fiktif seolah-olah diucapkan pembicara! Pada field 'hook_text', gunakan deskripsi singkat sorotan momen (contoh: "Sorotan Momen Pembuka").
 - Pastikan setiap klip memiliki start_time dan end_time yang realistis (antara 0 hingga ${videoDuration} detik), dengan durasi masing-masing klip berkisar 15 - 60 detik.
 `;
   }
