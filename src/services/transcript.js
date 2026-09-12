@@ -116,7 +116,6 @@ function formatSegments(segments) {
     .join('\n');
 }
 
-/**
 // In-memory cache untuk transkrip agar tidak perlu fetch berulang kali
 export const transcriptCache = new Map();
 
